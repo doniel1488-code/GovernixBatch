@@ -1,0 +1,39 @@
+# Слова, по которым плагин режет склеенный текст.
+# Если в сообщении встречается " lp group", " cmi ", " litebans " и т.п.
+# на них будет сделан разрыв — как будто это отдельные команды.
+split-keywords:
+  - lp
+  - cmi
+  - litebans
+  - coreprotect
+  - co
+  - worldedit
+  - we
+  - worldguard
+  - wg
+  - chunky
+  - vault
+  - money
+  - pay
+  - give
+  - gamemode
+  - heal
+  - feed
+  - fly
+  - kick
+  - ban
+  - mute
+  - warn
+  - say
+  - time
+  - weather
+  - give
+  - effect
+  - enchant
+  - xp
+  - exp
+
+# Дополнительный разделитель — если хочешь явно разделять команды.
+# Пример: "say A ;; say B ;; time set day"
+# Оставь пустым, чтобы отключить.
+separator: ";;"
