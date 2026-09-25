@@ -1,5 +1,6 @@
 package ru.governix.batch.gui;
 
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -25,9 +26,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * GUI со списком скриптов.
- */
 public class BatchGui implements Listener {
 
     private static final LegacyComponentSerializer L = LegacyComponentSerializer.legacyAmpersand();
@@ -42,10 +40,10 @@ public class BatchGui implements Listener {
         this.plugin = plugin;
     }
 
-    // ===================== OPEN MAIN =====================
+    // ===================== OPEN =====================
 
     public static void openMain(GovernixBatch plugin, Player player) {
-        Inventory inv = Bukkit.createInventory(null, 54, L.deserialize(TITLE_MAIN));
+        Inventory inv = Bukkit.createInventory(null, 54, Component.text("Скрипты GovernixBatch"));
         render(plugin, player, inv);
         player.openInventory(inv);
     }
@@ -55,40 +53,33 @@ public class BatchGui implements Listener {
 
         List<File> scripts = plugin.listScripts();
 
-        // Info-блок
-        inv.setItem(0, item(Material.BOOK,
+        inv.setItem(0, makeItem("BOOK",
                 plugin.msgRaw("gui-info-name"),
                 fillLore(plugin.msgList("gui-info-lore"),
                         "{scripts}", String.valueOf(scripts.size()),
-                        "{status}", plugin.isActive(player.getUniqueId())
-                                ? "§aактивен" : "§cвыключен",
-                        "{executed}", String.valueOf(plugin.getCount(player.getUniqueId())))
-                        .toArray(new String[0])));
+                        "{status}", plugin.isActive(player.getUniqueId()) ? "§aактивен" : "§cвыключен",
+                        "{executed}", String.valueOf(plugin.getCount(player.getUniqueId())))));
 
-        // Сессия
         boolean active = plugin.isActive(player.getUniqueId());
         if (active) {
-            inv.setItem(4, item(Material.LIME_DYE,
+            inv.setItem(4, makeItem("LIME_DYE",
                     plugin.msgRaw("gui-session-on-name"),
                     fillLore(plugin.msgList("gui-session-on-lore"),
-                            "{executed}", String.valueOf(plugin.getCount(player.getUniqueId())))
-                            .toArray(new String[0])));
+                            "{executed}", String.valueOf(plugin.getCount(player.getUniqueId())))));
         } else {
-            inv.setItem(4, item(Material.GRAY_DYE,
+            inv.setItem(4, makeItem("GRAY_DYE",
                     plugin.msgRaw("gui-session-off-name"),
-                    plugin.msgList("gui-session-off-lore").toArray(new String[0])));
+                    plugin.msgList("gui-session-off-lore")));
         }
 
-        // Обновить
-        inv.setItem(8, item(Material.SUNFLOWER,
+        inv.setItem(8, makeItem("SUNFLOWER",
                 plugin.msgRaw("gui-refresh-name"),
-                plugin.msgList("gui-refresh-lore").toArray(new String[0])));
+                plugin.msgList("gui-refresh-lore")));
 
-        // Скрипты
         if (scripts.isEmpty()) {
-            inv.setItem(22, item(Material.BARRIER,
+            inv.setItem(22, makeItem("BARRIER",
                     plugin.msgRaw("gui-empty-name"),
-                    plugin.msgList("gui-empty-lore").toArray(new String[0])));
+                    plugin.msgList("gui-empty-lore")));
         } else {
             int[] slots = buildSlots();
             SimpleDateFormat df = new SimpleDateFormat("dd.MM HH:mm");
@@ -106,24 +97,21 @@ public class BatchGui implements Listener {
                 }
 
                 String icon = pickIcon(plugin, f.getName());
-                Material mat = Material.matchMaterial(icon);
-                if (mat == null) mat = Material.PAPER;
 
                 List<String> lore = fillLore(plugin.msgList("gui-script-lore"),
                         "{lines}", String.valueOf(lines),
                         "{size}", size,
                         "{modified}", modified);
 
-                inv.setItem(slots[i], item(mat,
+                inv.setItem(slots[i], makeItem(icon,
                         "§e" + f.getName().replace(".txt", ""),
-                        lore.toArray(new String[0])));
+                        lore));
             }
         }
 
-        // Выход
-        inv.setItem(49, item(Material.BARRIER,
+        inv.setItem(49, makeItem("BARRIER",
                 plugin.msgRaw("gui-close-name"),
-                plugin.msgList("gui-close-lore").toArray(new String[0])));
+                plugin.msgList("gui-close-lore")));
     }
 
     private static int[] buildSlots() {
@@ -141,22 +129,21 @@ public class BatchGui implements Listener {
     private static void openConfirm(GovernixBatch plugin, Player player, File script) {
         int lines = plugin.countCommands(script);
 
-        Inventory inv = Bukkit.createInventory(null, 27, L.deserialize(TITLE_CONFIRM));
+        Inventory inv = Bukkit.createInventory(null, 27, Component.text("Подтверждение"));
 
-        inv.setItem(11, item(Material.LIME_DYE,
+        inv.setItem(11, makeItem("LIME_DYE",
                 plugin.msgRaw("confirm-yes-name"),
                 fillLore(plugin.msgList("confirm-yes-lore"),
                         "{file}", script.getName(),
-                        "{lines}", String.valueOf(lines))
-                        .toArray(new String[0])));
+                        "{lines}", String.valueOf(lines))));
 
-        inv.setItem(15, item(Material.RED_DYE,
+        inv.setItem(15, makeItem("RED_DYE",
                 plugin.msgRaw("confirm-no-name"),
-                plugin.msgList("confirm-no-lore").toArray(new String[0])));
+                plugin.msgList("confirm-no-lore")));
 
-        inv.setItem(13, item(Material.PAPER,
+        inv.setItem(13, makeItem("PAPER",
                 "§7" + script.getName(),
-                "§7Команд: §f" + lines));
+                List.of("§7Команд: §f" + lines)));
 
         pendingConfirm.put(player.getUniqueId(), script.getName());
         plugin.addPendingConfirm(player.getUniqueId());
@@ -172,11 +159,11 @@ public class BatchGui implements Listener {
 
         String title = LegacyComponentSerializer.legacySection().serialize(event.getView().title());
 
-        if (title.equals(TITLE_MAIN)) {
+        if (title.contains("Скрипты GovernixBatch")) {
             event.setCancelled(true);
             if (event.getClickedInventory() != event.getView().getTopInventory()) return;
             handleMainClick(player, event.getSlot(), event.isShiftClick(), event.isRightClick());
-        } else if (title.equals(TITLE_CONFIRM)) {
+        } else if (title.contains("Подтверждение")) {
             event.setCancelled(true);
             if (event.getClickedInventory() != event.getView().getTopInventory()) return;
             handleConfirmClick(player, event.getSlot());
@@ -221,7 +208,6 @@ public class BatchGui implements Listener {
 
         File script = scripts.get(idx);
 
-        // Shift+ЛКМ — удалить
         if (shift && !right) {
             if (!player.hasPermission("governixbatch.admin")) {
                 player.sendMessage(L.deserialize(plugin.msg("prefix") + plugin.msg("no-perm")));
@@ -235,14 +221,12 @@ public class BatchGui implements Listener {
             return;
         }
 
-        // ПКМ — предпросмотр
         if (right && !shift) {
             player.closeInventory();
             preview(player, script);
             return;
         }
 
-        // ЛКМ — запуск
         if (!shift) {
             int count = plugin.countCommands(script);
             if (count >= plugin.getConfirmThreshold()) {
@@ -263,8 +247,7 @@ public class BatchGui implements Listener {
 
         if (slot == 11) {
             if (file == null) return;
-            Bukkit.getScheduler().runTask(plugin, () ->
-                    plugin.runScript(player, file));
+            Bukkit.getScheduler().runTask(plugin, () -> plugin.runScript(player, file));
         } else if (slot == 15) {
             Bukkit.getScheduler().runTask(plugin, () -> openMain(plugin, player));
         }
@@ -274,7 +257,7 @@ public class BatchGui implements Listener {
     public void onClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
         String title = LegacyComponentSerializer.legacySection().serialize(event.getView().title());
-        if (title.equals(TITLE_CONFIRM)) {
+        if (title.contains("Подтверждение")) {
             pendingConfirm.remove(player.getUniqueId());
             plugin.removePendingConfirm(player.getUniqueId());
         }
@@ -310,16 +293,26 @@ public class BatchGui implements Listener {
 
     // ===================== HELPERS =====================
 
-    private static ItemStack item(Material mat, String name, String... lore) {
+    /**
+     * Создаёт ItemStack с помощью Adventure API.
+     * Если материал не найден — использует PAPER как fallback.
+     */
+    private static ItemStack makeItem(String materialName, String name, List<String> lore) {
+        Material mat = Material.matchMaterial(materialName);
+        if (mat == null) mat = Material.PAPER;
+
         ItemStack is = new ItemStack(mat);
         ItemMeta meta = is.getItemMeta();
         if (meta == null) return is;
-        meta.setDisplayName(name);
-        if (lore.length > 0) {
-            List<String> l = new ArrayList<>();
-            for (String s : lore) l.add(s);
-            meta.setLore(l);
+
+        meta.displayName(L.deserialize(name));
+
+        if (lore != null && !lore.isEmpty()) {
+            List<Component> loreComponents = new ArrayList<>();
+            for (String s : lore) loreComponents.add(L.deserialize(s));
+            meta.lore(loreComponents);
         }
+
         is.setItemMeta(meta);
         return is;
     }
