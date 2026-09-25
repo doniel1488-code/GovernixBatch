@@ -1,10 +1,11 @@
 package ru.governix.batch;
 
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import ru.governix.batch.gui.BatchGui;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,19 +17,32 @@ import java.util.regex.Pattern;
 
 public class GovernixBatch extends JavaPlugin {
 
+    private static final LegacyComponentSerializer L = LegacyComponentSerializer.legacyAmpersand();
+
     private final Map<UUID, Integer> activeSessions = new ConcurrentHashMap<>();
+    /** Игроки, у которых открыто окно подтверждения — блокируем повторное открытие */
+    private final Set<UUID> pendingConfirm = ConcurrentHashMap.newKeySet();
 
     private List<String> splitKeywords = new ArrayList<>();
     private String separator = ";;";
     private Pattern splitPattern;
+    private int confirmThreshold;
+    private boolean verbose;
+    private Map<String, String> scriptIcons = new HashMap<>();
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        loadSplitConfig();
+        loadConfig();
 
         getCommand("gbatch").setExecutor((sender, cmd, label, args) -> handle(sender, args));
+
         getServer().getPluginManager().registerEvents(new BatchListener(this), this);
+        getServer().getPluginManager().registerEvents(new BatchGui(this), this);
+
+        // Создать папку скриптов
+        File dir = new File(getDataFolder(), "scripts");
+        if (!dir.exists()) dir.mkdirs();
 
         getLogger().info("GovernixBatch v" + getDescription().getVersion() + " enabled!");
     }
@@ -36,21 +50,28 @@ public class GovernixBatch extends JavaPlugin {
     @Override
     public void onDisable() {
         activeSessions.clear();
+        pendingConfirm.clear();
         getLogger().info("GovernixBatch disabled!");
     }
 
-    private void loadSplitConfig() {
-        saveDefaultConfig();
+    public void loadConfig() {
         reloadConfig();
-
         splitKeywords = getConfig().getStringList("split-keywords");
         separator = getConfig().getString("separator", ";;");
+        confirmThreshold = getConfig().getInt("confirm-threshold", 5);
+        verbose = getConfig().getBoolean("verbose", true);
+
+        scriptIcons = new HashMap<>();
+        if (getConfig().isConfigurationSection("script-icons")) {
+            for (String key : getConfig().getConfigurationSection("script-icons").getKeys(false)) {
+                scriptIcons.put(key.toLowerCase(), getConfig().getString("script-icons." + key));
+            }
+        }
 
         if (splitKeywords.isEmpty()) {
             splitKeywords = List.of("lp", "cmi", "litebans", "coreprotect");
         }
 
-        // Собираем regex: (?<=\s|^)(?=kw1\s|kw2\s|...)
         StringBuilder sb = new StringBuilder("(?<=^|\\s)(?=(?:");
         for (int i = 0; i < splitKeywords.size(); i++) {
             if (i > 0) sb.append("|");
@@ -58,6 +79,11 @@ public class GovernixBatch extends JavaPlugin {
         }
         sb.append(")\\s)");
         splitPattern = Pattern.compile(sb.toString(), Pattern.CASE_INSENSITIVE);
+    }
+
+    public int reloadAll() {
+        loadConfig();
+        return splitKeywords.size();
     }
 
     // ===== API для listener =====
@@ -68,19 +94,22 @@ public class GovernixBatch extends JavaPlugin {
     public int increment(UUID uuid) { return activeSessions.merge(uuid, 1, Integer::sum); }
     public int getCount(UUID uuid) { return activeSessions.getOrDefault(uuid, 0); }
 
-    /**
-     * Разбивает одну длинную строку на список команд.
-     * Работает в 2 этапа:
-     *   1) Сначала по separator (`;;`) — если есть
-     *   2) Потом по split-keywords — если в строке несколько команд без разделителя
-     */
+    public boolean isPendingConfirm(UUID uuid) { return pendingConfirm.contains(uuid); }
+    public void addPendingConfirm(UUID uuid) { pendingConfirm.add(uuid); }
+    public void removePendingConfirm(UUID uuid) { pendingConfirm.remove(uuid); }
+
+    public int getConfirmThreshold() { return confirmThreshold; }
+    public boolean isVerbose() { return verbose; }
+    public Map<String, String> getScriptIcons() { return scriptIcons; }
+
+    // ===== Разбивка команд =====
+
     public List<String> splitCommands(String input) {
         if (input == null || input.isBlank()) return List.of();
 
         List<String> result = new ArrayList<>();
         String normalized = input.replace("\r", " ").replace("\n", " ").trim();
 
-        // Шаг 1 — по явному разделителю
         List<String> chunks;
         if (separator != null && !separator.isEmpty() && normalized.contains(separator)) {
             chunks = new ArrayList<>();
@@ -91,17 +120,14 @@ public class GovernixBatch extends JavaPlugin {
             chunks = List.of(normalized);
         }
 
-        // Шаг 2 — по ключевым словам
         for (String chunk : chunks) {
             if (chunk.isEmpty()) continue;
-
             String[] parts = splitPattern.split(chunk);
             for (String p : parts) {
                 String cmd = p.trim();
                 if (!cmd.isEmpty()) result.add(cmd);
             }
         }
-
         return result;
     }
 
@@ -109,75 +135,107 @@ public class GovernixBatch extends JavaPlugin {
 
     private boolean handle(CommandSender sender, String[] args) {
         if (!sender.hasPermission("governixbatch.use")) {
-            sender.sendMessage("§cНет прав.");
+            sender.sendMessage(L.deserialize(msg("no-perm")));
             return true;
         }
 
         if (args.length == 0) {
-            sender.sendMessage("§8§m-------------------------");
-            sender.sendMessage("§bGovernixBatch §7— утилита массовых команд");
-            sender.sendMessage("");
-            sender.sendMessage("§e/gbatch start §7— войти в режим");
-            sender.sendMessage("§e/gbatch stop §7— выйти");
-            sender.sendMessage("§e/gbatch status §7— сколько выполнил");
-            sender.sendMessage("§e/gbatch run <файл> §7— выполнить файл из scripts/");
-            sender.sendMessage("§e/gbatch reload §7— перезагрузить конфиг");
-            sender.sendMessage("");
-            sender.sendMessage("§7Пока режим активен — пиши команды в чат без §f/§7.");
-            sender.sendMessage("§7Можно вставлять целые блоки — плагин разобьёт сам.");
-            sender.sendMessage("§8§m-------------------------");
+            if (sender instanceof Player player) {
+                BatchGui.openMain(this, player);
+            } else {
+                sendConsoleHelp(sender);
+            }
             return true;
         }
 
         switch (args[0].toLowerCase()) {
+            case "gui", "menu" -> {
+                if (sender instanceof Player player) BatchGui.openMain(this, player);
+                else sendConsoleHelp(sender);
+            }
             case "start" -> {
-                if (!(sender instanceof org.bukkit.entity.Player player)) {
-                    sender.sendMessage("§cТолько для игроков.");
-                    return true;
-                }
+                if (!(sender instanceof Player player)) return true;
                 if (isActive(player.getUniqueId())) {
-                    sender.sendMessage("§cРежим уже активен. §7/gbatch stop");
+                    player.sendMessage(L.deserialize(msg("prefix") + "&cРежим уже активен."));
                     return true;
                 }
                 start(player.getUniqueId());
-                sender.sendMessage("§a§l▸ §aРежим §fBATCH §aвключён.");
-                sender.sendMessage("§7Пиши или вставляй команды в чат без §f/§7.");
-                sender.sendMessage("§7Для выхода: §f/gbatch stop §7или слово §fend");
+                player.sendMessage(L.deserialize(msg("prefix") + "&a§l▸ &aРежим &fBATCH &aвключён."));
+                player.sendMessage(L.deserialize("&7Пиши или вставляй команды в чат без &f/&7."));
+                player.sendMessage(L.deserialize("&7Для выхода: &f/gbatch stop &7или слово &fend"));
             }
-
             case "stop", "end" -> {
-                if (!(sender instanceof org.bukkit.entity.Player player)) return true;
+                if (!(sender instanceof Player player)) return true;
                 int done = getCount(player.getUniqueId());
                 stop(player.getUniqueId());
-                sender.sendMessage("§c§l▸ §cРежим §fBATCH §cвыключен. §7Выполнено: §f" + done);
+                player.sendMessage(L.deserialize(msg("prefix") + "&c§l▸ &cРежим &fBATCH &cвыключен. &7Выполнено: &f" + done));
             }
-
             case "status" -> {
-                if (!(sender instanceof org.bukkit.entity.Player player)) return true;
+                if (!(sender instanceof Player player)) return true;
                 boolean on = isActive(player.getUniqueId());
-                sender.sendMessage("§7Статус: " + (on ? "§aактивен" : "§cвыключен")
-                        + " §7| Выполнено: §f" + getCount(player.getUniqueId()));
+                player.sendMessage(L.deserialize(msg("prefix") + "&7Статус: "
+                        + (on ? "&aактивен" : "&cвыключен")
+                        + " &7| Выполнено: &f" + getCount(player.getUniqueId())));
             }
-
             case "reload" -> {
-                loadSplitConfig();
-                sender.sendMessage("§aКонфиг перезагружен. §7Ключей: §f" + splitKeywords.size());
+                int n = reloadAll();
+                sender.sendMessage(L.deserialize(msg("prefix") + msg("reloaded").replace("{count}", String.valueOf(n))));
             }
-
             case "run" -> {
                 if (args.length < 2) {
-                    sender.sendMessage("§cИспользование: §f/gbatch run <файл>");
+                    sender.sendMessage(L.deserialize("&cИспользование: &f/gbatch run <файл>"));
                     return true;
                 }
                 runScript(sender, args[1]);
             }
-
-            default -> sender.sendMessage("§cНеизвестная подкоманда. §7/gbatch");
+            default -> {
+                if (sender instanceof Player player) BatchGui.openMain(this, player);
+                else sendConsoleHelp(sender);
+            }
         }
         return true;
     }
 
-    private void runScript(CommandSender sender, String fileName) {
+    private void sendConsoleHelp(CommandSender s) {
+        s.sendMessage("§8§m-------------------------");
+        s.sendMessage("§bGovernixBatch §7— утилита массовых команд");
+        s.sendMessage("§e/gbatch gui §7— меню скриптов (для игроков)");
+        s.sendMessage("§e/gbatch start §7— режим чата");
+        s.sendMessage("§e/gbatch stop §7— выйти");
+        s.sendMessage("§e/gbatch status §7— статистика");
+        s.sendMessage("§e/gbatch run <файл> §7— выполнить скрипт");
+        s.sendMessage("§e/gbatch reload §7— перечитать конфиг");
+        s.sendMessage("§8§m-------------------------");
+    }
+
+    // ===== Запуск скриптов =====
+
+    public List<File> listScripts() {
+        File dir = new File(getDataFolder(), "scripts");
+        if (!dir.exists()) dir.mkdirs();
+        File[] files = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".txt"));
+        if (files == null) return List.of();
+        List<File> list = new ArrayList<>(Arrays.asList(files));
+        list.sort(Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER));
+        return list;
+    }
+
+    public int countCommands(File file) {
+        try {
+            List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
+            int n = 0;
+            for (String raw : lines) {
+                String line = raw.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                n++;
+            }
+            return n;
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
+    public void runScript(CommandSender sender, String fileName) {
         File dir = new File(getDataFolder(), "scripts");
         if (!dir.exists()) dir.mkdirs();
 
@@ -185,7 +243,7 @@ public class GovernixBatch extends JavaPlugin {
         File file = new File(dir, fileName);
 
         if (!file.exists()) {
-            sender.sendMessage("§cФайл не найден: §f" + file.getName());
+            sender.sendMessage(L.deserialize(msg("prefix") + msg("script-not-found").replace("{file}", file.getName())));
             return;
         }
 
@@ -193,7 +251,7 @@ public class GovernixBatch extends JavaPlugin {
         try {
             lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            sender.sendMessage("§cОшибка чтения файла: §f" + e.getMessage());
+            sender.sendMessage(L.deserialize(msg("prefix") + "&cОшибка чтения файла: &f" + e.getMessage()));
             return;
         }
 
@@ -202,9 +260,33 @@ public class GovernixBatch extends JavaPlugin {
             String line = raw.trim();
             if (line.isEmpty() || line.startsWith("#")) continue;
             if (line.startsWith("/")) line = line.substring(1);
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), line);
-            executed++;
+            try {
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), line);
+                executed++;
+                if (sender instanceof Player p && verbose) {
+                    p.sendMessage(L.deserialize("§8§l▸ §7" + line));
+                }
+            } catch (Exception ex) {
+                sender.sendMessage(L.deserialize("§c✖ §7" + line + " §8— " + ex.getMessage()));
+            }
         }
-        sender.sendMessage("§a§l▸ §aВыполнено §f" + executed + " §aкоманд из §f" + file.getName());
+        sender.sendMessage(L.deserialize(msg("prefix")
+                + msg("script-ran")
+                .replace("{count}", String.valueOf(executed))
+                .replace("{file}", file.getName())));
+    }
+
+    // ===== Сообщения =====
+
+    public String msg(String key) {
+        return getConfig().getString("messages." + key, "&cMissing: " + key);
+    }
+
+    public String msgRaw(String key) {
+        return getConfig().getString("messages." + key, "&cMissing: " + key);
+    }
+
+    public List<String> msgList(String key) {
+        return getConfig().getStringList("messages." + key);
     }
 }
