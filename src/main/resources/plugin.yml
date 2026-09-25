@@ -8,10 +8,13 @@ description: Run many console commands at once via chat batch mode
 commands:
   gbatch:
     description: Batch command executor
-    usage: /gbatch <start|stop|status|run <file>>
+    usage: /gbatch <gui|start|stop|status|run <file>|reload>
     aliases: [gcmds, gb]
 
 permissions:
   governixbatch.use:
     description: Access to /gbatch
+    default: op
+  governixbatch.admin:
+    description: Delete scripts, reload
     default: op
