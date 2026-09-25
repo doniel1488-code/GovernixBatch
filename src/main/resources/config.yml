@@ -1,6 +1,4 @@
-# Слова, по которым плагин режет склеенный текст.
-# Если в сообщении встречается " lp group", " cmi ", " litebans " и т.п.
-# на них будет сделан разрыв — как будто это отдельные команды.
+# Слова, по которым плагин режет склеенный текст
 split-keywords:
   - lp
   - cmi
@@ -27,13 +25,92 @@ split-keywords:
   - say
   - time
   - weather
-  - give
   - effect
   - enchant
   - xp
   - exp
 
-# Дополнительный разделитель — если хочешь явно разделять команды.
-# Пример: "say A ;; say B ;; time set day"
-# Оставь пустым, чтобы отключить.
 separator: ";;"
+
+# Порог, после которого требуется подтверждение (команд в скрипте)
+confirm-threshold: 5
+
+# Показывать сообщение о каждой выполненной команде в чате
+verbose: true
+
+# Иконки для скриптов по имени (частичное совпадение, регистр не важен)
+# Формат: часть_имени=MATERIAL
+script-icons:
+  mod=LIME_DYE
+  admin=RED_DYE
+  builder=GOLDEN_PICKAXE
+  trusted=DIAMOND
+  default=IRON_INGOT
+  new=OAK_SAPLING
+  owner=NETHER_STAR
+  perms=LUCK
+  group=COMPARATOR
+  setup=REDSTONE
+  reset=BARRIER
+  test=EXPERIENCE_BOTTLE
+
+messages:
+  prefix: "&8[&bBatch&8] "
+  no-perm: "&cНет прав."
+  script-not-found: "&cФайл не найден: &f{file}"
+  script-ran: "&a§l▸ &aВыполнено &f{count} &aкоманд из &f{file}"
+  reloaded: "&aКонфиг перезагружен. Ключей: &f{count}"
+  gui-title: "&8Скрипты GovernixBatch"
+  gui-info-name: "&b&lGovernixBatch"
+  gui-info-lore:
+    - "&7Скриптов найдено: &f{scripts}"
+    - "&7Batch-режим: {status}"
+    - "&7Всего выполнено: &f{executed}"
+    - ""
+    - "&7ЛКМ по скрипту — запустить"
+    - "&7ПКМ — предпросмотр"
+    - "&7Shift+ЛКМ — удалить"
+    - "&7Shift+ПКМ — перечитать"
+  gui-empty-name: "&7Нет скриптов"
+  gui-empty-lore:
+    - "&7Положи .txt в папку"
+    - "&fplugins/GovernixBatch/scripts/"
+  gui-script-lore:
+    - "&7Команд: &f{lines}"
+    - "&7Размер: &f{size}"
+    - "&7Изменён: &f{modified}"
+    - ""
+    - "&eЛКМ &7— запустить"
+    - "&eПКМ &7— предпросмотр"
+    - "&eShift+ЛКМ &7— удалить"
+  gui-close-name: "&cВыход"
+  gui-close-lore:
+    - "&7Закрыть меню"
+  gui-refresh-name: "&aОбновить список"
+  gui-refresh-lore:
+    - "&7Перечитать папку scripts/"
+  gui-session-on-name: "&a&lСессия активна"
+  gui-session-on-lore:
+    - "&7Всего выполнено: &f{executed}"
+    - "&7Ты в batch-режиме"
+    - ""
+    - "&eЛКМ &7— выйти"
+  gui-session-off-name: "&7&lСессия выключена"
+  gui-session-off-lore:
+    - "&7Нажми /gbatch start"
+    - "&7чтобы войти в batch-режим"
+    - "и вставлять команды пачкой"
+  confirm-title: "&8Подтверждение"
+  confirm-yes-name: "&a&l✔ Запустить"
+  confirm-yes-lore:
+    - "&7Файл: &f{file}"
+    - "&7Команд: &f{lines}"
+  confirm-no-name: "&c&l✖ Отмена"
+  confirm-no-lore:
+    - "&7Вернуться к списку"
+  confirm-sent: "&eПодтверждение отправлено в чат..."
+  preview-header: "&8&m----- &b{file} &8&m-----"
+  preview-line: "&7{line}"
+  preview-more: "&8... и ещё &f{count} &8строк"
+  script-deleted: "&aСкрипт удалён: &f{file}"
+  gui-locked: "&cПодтверждение уже открыто в другом окне."
