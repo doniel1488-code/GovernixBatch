@@ -26,21 +26,21 @@ public class BatchListener implements Listener {
         String text = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
         if (text.isEmpty()) return;
 
-        // Разбиваем на команды
         List<String> commands = plugin.splitCommands(text);
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             for (String line : commands) {
                 if (line.isEmpty()) continue;
 
-                // Локальные команды выхода
                 if (line.equalsIgnoreCase("end")
                         || line.equalsIgnoreCase("stop")
                         || line.equalsIgnoreCase("стоп")
                         || line.equalsIgnoreCase("выход")) {
                     int done = plugin.getCount(player.getUniqueId());
                     plugin.stop(player.getUniqueId());
-                    player.sendMessage("§c§l▸ §cРежим §fBATCH §cвыключен. §7Выполнено: §f" + done);
+                    player.sendMessage(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                            .legacyAmpersand().deserialize(
+                                    "§c§l▸ §cРежим §fBATCH §cвыключен. §7Выполнено: §f" + done));
                     return;
                 }
 
@@ -49,9 +49,13 @@ public class BatchListener implements Listener {
                 try {
                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), line);
                     plugin.increment(player.getUniqueId());
-                    player.sendMessage("§8§l▸ §7" + line);
+                    if (plugin.isVerbose()) {
+                        player.sendMessage(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                                .legacyAmpersand().deserialize("§8§l▸ §7" + line));
+                    }
                 } catch (Exception ex) {
-                    player.sendMessage("§c✖ §7" + line + " §8— " + ex.getMessage());
+                    player.sendMessage(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                            .legacyAmpersand().deserialize("§c✖ §7" + line + " §8— " + ex.getMessage()));
                 }
             }
         });
@@ -60,5 +64,6 @@ public class BatchListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         plugin.stop(event.getPlayer().getUniqueId());
+        plugin.removePendingConfirm(event.getPlayer().getUniqueId());
     }
 }
