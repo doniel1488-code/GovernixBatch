@@ -27,13 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * GUI со списком скриптов.
- *
- * Слоты:
- *  0 — info-блок
- *  4 — сессия on/off
- *  8 — обновить список
- *  18..44 — скрипты (по 7 в ряд, 4 ряда = 28 слотов)
- *  49 — выход
  */
 public class BatchGui implements Listener {
 
@@ -41,7 +34,6 @@ public class BatchGui implements Listener {
     private static final String TITLE_MAIN = "§8Скрипты GovernixBatch";
     private static final String TITLE_CONFIRM = "§8Подтверждение";
 
-    /** Игрок → название файла, который он подтверждает */
     private static final ConcurrentHashMap<UUID, String> pendingConfirm = new ConcurrentHashMap<>();
 
     private final GovernixBatch plugin;
@@ -62,8 +54,6 @@ public class BatchGui implements Listener {
         inv.clear();
 
         List<File> scripts = plugin.listScripts();
-        int totalCommands = 0;
-        for (File f : scripts) totalCommands += plugin.countCommands(f);
 
         // Info-блок
         inv.setItem(0, item(Material.BOOK,
@@ -72,7 +62,8 @@ public class BatchGui implements Listener {
                         "{scripts}", String.valueOf(scripts.size()),
                         "{status}", plugin.isActive(player.getUniqueId())
                                 ? "§aактивен" : "§cвыключен",
-                        "{executed}", String.valueOf(plugin.getCount(player.getUniqueId())))));
+                        "{executed}", String.valueOf(plugin.getCount(player.getUniqueId())))
+                        .toArray(new String[0])));
 
         // Сессия
         boolean active = plugin.isActive(player.getUniqueId());
@@ -80,7 +71,8 @@ public class BatchGui implements Listener {
             inv.setItem(4, item(Material.LIME_DYE,
                     plugin.msgRaw("gui-session-on-name"),
                     fillLore(plugin.msgList("gui-session-on-lore"),
-                            "{executed}", String.valueOf(plugin.getCount(player.getUniqueId())))));
+                            "{executed}", String.valueOf(plugin.getCount(player.getUniqueId())))
+                            .toArray(new String[0])));
         } else {
             inv.setItem(4, item(Material.GRAY_DYE,
                     plugin.msgRaw("gui-session-off-name"),
@@ -138,7 +130,7 @@ public class BatchGui implements Listener {
         List<Integer> list = new ArrayList<>();
         for (int row = 2; row <= 5; row++) {
             for (int col = 0; col < 7; col++) {
-                list.add(row * 9 + col + 1); // 19..25, 28..34, 37..43, 46..52
+                list.add(row * 9 + col + 1);
             }
         }
         return list.stream().mapToInt(Integer::intValue).toArray();
@@ -155,7 +147,8 @@ public class BatchGui implements Listener {
                 plugin.msgRaw("confirm-yes-name"),
                 fillLore(plugin.msgList("confirm-yes-lore"),
                         "{file}", script.getName(),
-                        "{lines}", String.valueOf(lines))));
+                        "{lines}", String.valueOf(lines))
+                        .toArray(new String[0])));
 
         inv.setItem(15, item(Material.RED_DYE,
                 plugin.msgRaw("confirm-no-name"),
@@ -191,10 +184,8 @@ public class BatchGui implements Listener {
     }
 
     private void handleMainClick(Player player, int slot, boolean shift, boolean right) {
-        // Info — ничего
         if (slot == 0) return;
 
-        // Сессия — переключить
         if (slot == 4) {
             if (plugin.isActive(player.getUniqueId())) {
                 int done = plugin.getCount(player.getUniqueId());
@@ -210,19 +201,16 @@ public class BatchGui implements Listener {
             return;
         }
 
-        // Refresh
         if (slot == 8) {
             openMain(plugin, player);
             return;
         }
 
-        // Close
         if (slot == 49) {
             player.closeInventory();
             return;
         }
 
-        // Скрипт
         List<File> scripts = plugin.listScripts();
         int[] slots = buildSlots();
         int idx = -1;
@@ -277,9 +265,7 @@ public class BatchGui implements Listener {
             if (file == null) return;
             Bukkit.getScheduler().runTask(plugin, () ->
                     plugin.runScript(player, file));
-        }
-        // slot 15 — отмена → вернуться в главное меню
-        else if (slot == 15) {
+        } else if (slot == 15) {
             Bukkit.getScheduler().runTask(plugin, () -> openMain(plugin, player));
         }
     }
@@ -289,7 +275,6 @@ public class BatchGui implements Listener {
         if (!(event.getPlayer() instanceof Player player)) return;
         String title = LegacyComponentSerializer.legacySection().serialize(event.getView().title());
         if (title.equals(TITLE_CONFIRM)) {
-            // Закрытие окна = отмена
             pendingConfirm.remove(player.getUniqueId());
             plugin.removePendingConfirm(player.getUniqueId());
         }
@@ -320,7 +305,6 @@ public class BatchGui implements Listener {
         }
 
         player.sendMessage(L.deserialize("§8§m-------------------------------"));
-        // Открываем меню через секунду, чтобы игрок успел прочитать
         Bukkit.getScheduler().runTaskLater(plugin, () -> openMain(plugin, player), 5L);
     }
 
