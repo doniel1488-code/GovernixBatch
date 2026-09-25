@@ -1,0 +1,17 @@
+name: GovernixBatch
+version: '${project.version}'
+main: ru.governix.batch.GovernixBatch
+api-version: '1.21'
+author: Governix
+description: Run many console commands at once via chat batch mode
+
+commands:
+  gbatch:
+    description: Batch command executor
+    usage: /gbatch <start|stop|status|run <file>>
+    aliases: [gcmds, gb]
+
+permissions:
+  governixbatch.use:
+    description: Access to /gbatch
+    default: op
