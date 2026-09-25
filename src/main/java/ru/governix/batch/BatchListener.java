@@ -9,6 +9,8 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.List;
+
 public class BatchListener implements Listener {
 
     private final GovernixBatch plugin;
@@ -24,12 +26,11 @@ public class BatchListener implements Listener {
         String text = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
         if (text.isEmpty()) return;
 
-        // Разбиваем по \n на случай многострочной вставки
-        String[] lines = text.split("\\r?\\n");
+        // Разбиваем на команды
+        List<String> commands = plugin.splitCommands(text);
 
         Bukkit.getScheduler().runTask(plugin, () -> {
-            for (String raw : lines) {
-                String line = raw.trim();
+            for (String line : commands) {
                 if (line.isEmpty()) continue;
 
                 // Локальные команды выхода
