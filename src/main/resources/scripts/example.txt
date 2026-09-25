@@ -1,0 +1,14 @@
+# Комментарии начинаются с #
+# Каждая строка — команда БЕЗ начального слеша
+# Пустые строки игнорируются
+
+# Пример:
+lp group mod permission set cmi.command.mute true
+lp group mod permission set cmi.command.kick true
+lp group mod permission set cmi.command.warn true
+lp group mod permission set cmi.command.fly true
+
+# Работает с любыми командами
+say Привет от консольного скрипта
+time set day
+weather clear
